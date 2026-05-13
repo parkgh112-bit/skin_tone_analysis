@@ -37,6 +37,9 @@
 
 
 `.env` 파일 형태
+
 GOOGLE_API_KEY= ###
+
 NEXT_PUBLIC_SUPABASE_URL=###
+
 NEXT_PUBLIC_SUPABASE_ANON_KEY=###
