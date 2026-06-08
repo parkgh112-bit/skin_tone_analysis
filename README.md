@@ -36,10 +36,16 @@
 - 실행을 위해서는 루트 디렉토리에 `.env` 파일(API Key 등)이 필요합니다.
 
 
-`.env` 파일 형태
+### `.env` 파일 형태
 
 GOOGLE_API_KEY= ###
 
+NEXT_PUBLIC_SUPABASE_URL=###
+
+NEXT_PUBLIC_SUPABASE_ANON_KEY=###
+
+### 개선 사항
+frontend/ 에 .env.local 파일 필요
 NEXT_PUBLIC_SUPABASE_URL=###
 
 NEXT_PUBLIC_SUPABASE_ANON_KEY=###
