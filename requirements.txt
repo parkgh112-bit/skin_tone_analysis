@@ -1,0 +1,12 @@
+flask
+flask-cors
+opencv-python
+mediapipe
+numpy
+pandas
+joblib
+lightgbm
+scikit-learn
+google-generativeai
+supabase
+python-dotenv
