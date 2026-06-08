@@ -280,15 +280,46 @@ def extract_features(image_path):
         except: continue
     return features, lip_coords, cheek_coords
 
-def get_user_pro_data(user_name):
-    csv_path = os.path.join(os.path.dirname(BASE_DIR), 'code/skin_type_result (2).csv')
-    if not os.path.exists(csv_path): return None
+def get_user_pro_data(user_name, csv_path=None):
+    """(1)번 형식의 CSV를 메모리에서 직접 (2)번 형식으로 변환하여 데이터를 반환합니다."""
+    if not csv_path:
+        csv_path = os.path.join(os.path.dirname(BASE_DIR), 'skin_type_result (1).csv')
+    
+    if not os.path.exists(csv_path):
+        return None
+    
     try:
-        df = pd.read_csv(csv_path)
+        # 인코딩 시도: utf-8-sig -> cp949
+        try:
+            df = pd.read_csv(csv_path, encoding='utf-8-sig')
+        except:
+            df = pd.read_csv(csv_path, encoding='cp949')
+        
         df.columns = df.columns.str.strip()
-        user_row = df[df['Name'].str.contains(user_name, na=False, case=False)]
-        return user_row.iloc[0].to_dict() if not user_row.empty else None
-    except: return None
+        
+        # (1)번 형식에서 필요한 컬럼만 추출하여 메모리에서 변환
+        # 원본 (1)번 구조: 1(Name), 2(DOB), 3(Age), 4(Sex), 9(Date) + 10... (데이터 지표)
+        if df.shape[1] > 10:
+            data_cols = df.columns[10:].tolist()
+            selected_indices = [1, 2, 3, 4, 9] + list(range(10, df.shape[1]))
+            
+            df_transformed = df.iloc[:, selected_indices].copy()
+            df_transformed.columns = ['Name', 'DOB', 'Age', 'Sex', 'Date'] + data_cols
+            
+            # Date 포맷 정리 (초 제거: 2025-10-30 16:37:40 -> 2025-10-30 16:37)
+            try:
+                df_transformed['Date'] = pd.to_datetime(df_transformed['Date']).dt.strftime('%Y-%m-%d %H:%M')
+            except:
+                pass
+            
+            # 검색 수행
+            user_row = df_transformed[df_transformed['Name'].astype(str).str.contains(user_name, na=False, case=False)]
+            return user_row.iloc[0].to_dict() if not user_row.empty else None
+            
+    except Exception as e:
+        print(f"get_user_pro_data Error ({csv_path}): {e}")
+    
+    return None
 
 # ---------------------------------------------------------
 # 7. Admin & Threshold Management Routes
@@ -504,18 +535,19 @@ def chat():
 def recommend_pro():
     data = request.json
     user_name = data.get('name', '')
+    csv_path = data.get('csv_path') # 동적 파일 경로 지원
     raw_input_data = data.get('raw_data') # 프론트엔드에서 직접 전달된 CSV 행 데이터
 
     # 1. 캐시 확인 (이름 기반 조회 시에만)
-    if not raw_input_data and supabase:
+    if not raw_input_data and not csv_path and supabase:
         try:
             cache_res = supabase.table('pro_analysis_cache').select('*').eq('user_name', user_name).execute()
             if cache_res.data:
                 return jsonify({"recommendations": cache_res.data[0]['analysis_result'], "raw_metrics": cache_res.data[0]['raw_metrics'], "is_cached": True})
         except: pass
 
-    # 2. 데이터 추출 (직접 전달된 데이터가 있으면 그것을 사용, 없으면 서버 CSV에서 조회)
-    pro_data = raw_input_data if raw_input_data else get_user_pro_data(user_name)
+    # 2. 데이터 추출
+    pro_data = raw_input_data if raw_input_data else get_user_pro_data(user_name, csv_path)
     if not pro_data: return jsonify({'error': '데이터를 찾을 수 없습니다.'}), 404
 
     def f_v(pattern, default=0.0):
